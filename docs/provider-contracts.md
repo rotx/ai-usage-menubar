@@ -137,6 +137,46 @@ AI Usage's no-background-log-scanning design. OpenRouter and Z.ai are also
 excluded because they require users to add API keys instead of reusing a local
 agent login.
 
+## Muse Code
+
+Contract researched against the [CodexBar Muse provider](https://github.com/steipete/CodexBar/blob/main/Sources/CodexBarCore/Resources/Plugins/muse.ts)
+and [credential reader](https://github.com/steipete/CodexBar/blob/main/Sources/CodexBarCore/Providers/Muse/MuseCredentials.swift).
+
+Credential source order:
+
+1. Inline `providers.meta.access_token` in `$MUSE_AUTH_PATH`, otherwise
+   `$XDG_CONFIG_HOME/muse/auth.json`, otherwise `~/.config/muse/auth.json`.
+2. macOS Keychain service `ai.meta.dev.credentials`, account `meta`, JSON field
+   `access_token`.
+
+Only the device-code `dca:` token is accepted. An invalid inline token fails
+without switching to a different Keychain account. Inference keys (`LLM|` or
+`LLM_`) cannot read subscription quota. No refresh-token exchange is attempted;
+a rejected login asks the user to run `muse login` again. The first Keychain
+read allows up to 60 seconds for the macOS authentication prompt; timeout and
+access failures explain how to retry. Credentials are never written by this
+provider.
+
+Usage request:
+
+- `POST https://api.meta.ai/muse-code/key`
+- `Authorization: Bearer <device-code access token>`
+- `x-api-version: 1.0.0`, JSON body `{"onboard":false}`
+
+The response may contain the account's standing inference key and payment
+metadata; only subscription status, plan, and quota fields are decoded.
+`subs_tier_name` is the plan. `subs_usage.window.used_percent` is Session
+(usually 300 minutes / 5 hours) and `subs_usage.weekly.used_percent` is Weekly.
+`resets_at` is epoch seconds. Percentages are clamped to 0–100; out-of-range
+reset dates are omitted. At the user's request, a valid active subscription
+response that omits the weekly quota is treated as exhausted: Weekly is 100%
+used / 0% left, with no invented reset date. Reported weekly data takes
+precedence. This is a requested fallback, not a guarantee that missing quota
+means exhaustion; Meta can also omit quotas while the session window is idle.
+Missing session quota is left unavailable. Browser cookies and team quota are
+not read. Inactive subscriptions and incomplete billing produce an actionable account error. A `429` honors `Retry-After`
+and suppresses requests until that cooldown expires, including manual refresh.
+
 ## Persistence and failure policy
 
 Rotated credentials are persisted only to the source from which they were

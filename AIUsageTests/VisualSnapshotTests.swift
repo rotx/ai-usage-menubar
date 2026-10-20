@@ -160,8 +160,8 @@ final class VisualSnapshotTests: XCTestCase {
             let width = MenuBarPanelRoute.settings.width
             let size = measuredSize(of: view, width: width)
             XCTAssertEqual(size.width, width, accuracy: 0.5)
-            XCTAssertLessThan(size.height, 720)
-            XCTAssertGreaterThan(size.height, 620)
+            XCTAssertLessThanOrEqual(size.height, 900)
+            XCTAssertGreaterThan(size.height, 720)
         }
 
         defaults.removePersistentDomain(forName: suiteName)
@@ -445,6 +445,15 @@ final class VisualSnapshotTests: XCTestCase {
                 windows: [
                     QuotaWindow(kind: .daily, usedPercent: 20, resetsAt: nil),
                     QuotaWindow(kind: .weekly, usedPercent: 65, resetsAt: nil)
+                ],
+                fetchedAt: now
+            ),
+            .muse: ProviderSnapshot(
+                provider: .muse,
+                planName: "Power Usage",
+                windows: [
+                    QuotaWindow(kind: .session, usedPercent: 24, resetsAt: nil),
+                    QuotaWindow(kind: .weekly, usedPercent: 68, resetsAt: nil)
                 ],
                 fetchedAt: now
             ),

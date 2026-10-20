@@ -143,6 +143,7 @@ struct RefreshButtonLabel: View {
 }
 
 struct DashboardContentView: View {
+    @Environment(\.menuBarPanelMaximumHeight) private var maximumPanelHeight
     @Bindable var store: UsageStore
     @Binding var usageDisplayMode: UsageDisplayMode
 
@@ -155,21 +156,14 @@ struct DashboardContentView: View {
         .padding(.bottom, 6)
     }
 
-    @ViewBuilder
     private var providerRows: some View {
-        if visibleProviders.count > 2 {
-            ScrollView {
-                providerRowsContent
-            }
-            .frame(maxHeight: 390)
-            .scrollIndicators(.hidden)
-        } else {
+        AdaptiveScrollView(maximumHeight: max(120, maximumPanelHeight - 110)) {
             providerRowsContent
         }
     }
 
     private var providerRowsContent: some View {
-        LazyVStack(spacing: 8) {
+        VStack(spacing: 8) {
             ForEach(visibleProviders) { provider in
                 if let state = store.states[provider] {
                     ProviderSectionView(

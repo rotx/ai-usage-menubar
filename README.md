@@ -71,9 +71,11 @@ the menu bar rather than the Dock. macOS 26 or newer is required.
 - GitHub Copilot credits, chat, and completions
 - Devin daily and weekly quota
 - Grok weekly quota
+- Meta Muse Code 5-hour and weekly subscription limits
 - Claude Code extra usage and Codex credits when available
 - Remaining or used percentages, switchable directly in the panel
 - Independent menu bar controls and metric choices for each provider
+- Auto, side-by-side, and stacked session/weekly display, with optional percent signs
 - Configurable 1, 5, 15, 30, or 60-minute refresh and one-click manual refresh
 - Signed update checks at launch and daily, plus **Check for Updates…**
 - A direct **Update** button in the panel when a new version is available
@@ -127,6 +129,32 @@ Every provider can be shown or hidden independently. Under each provider,
 choose any metric it currently returns. A single metric shows only its value;
 multiple metrics use tiny labels to stay compact. **Weekly** is selected for
 Claude Code and Codex by default, and **Left** is the default number mode.
+
+In **Settings → General → Menu bar limits**, choose:
+
+- **Selected metrics** to keep your per-provider metric selections (the default).
+- **Auto** to choose the higher-used limit when both Session and Weekly are
+  selected. Its S or W prefix identifies the chosen limit unless
+  **Show S / W in menu bar** is disabled. Selecting only one limit shows that
+  value without a prefix, in either Used or Left number mode.
+- **Side by side** to show both available limits horizontally.
+- **Stacked** to show the session above weekly in two compact rows.
+
+The usage and Settings panels expand vertically to fit their contents within
+the screen's available height, with scrolling for overflow.
+
+These modes keep any additional selected metrics. Providers with only one
+limit show that limit. **Show % in menu bar** controls percent signs; accessible
+labels still announce the units. Turn off **Show S / W in menu bar** under
+**Limit labels** to hide the session and weekly prefixes in either layout;
+other metric labels remain visible.
+
+Muse Code reuses `muse login` credentials from its auth file or macOS Keychain.
+It needs a subscription login, rather than a Model API inference key. Meta may
+omit quota windows from the login response. In this build, an omitted Muse
+weekly reading is treated as exhausted (0% left), as requested; a reported
+weekly reading always takes precedence. This fallback assumes exhaustion and
+does not establish when the weekly quota resets.
 
 Raw percentages are shown exactly as reported by the provider. Only progress
 bar drawing is clamped to `0...100`. Remaining usage is bounded to `0...100`

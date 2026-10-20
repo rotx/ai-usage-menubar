@@ -43,7 +43,9 @@ struct ProviderSectionView: View {
                     .padding(.bottom, 14)
             } else {
                 ProviderStatusRow(
-                    message: "No quota data yet.",
+                    message: state.provider == .muse && state.snapshot != nil
+                        ? "Quota not included in this login response."
+                        : "No quota data yet.",
                     systemImage: "chart.bar.xaxis"
                 )
             }

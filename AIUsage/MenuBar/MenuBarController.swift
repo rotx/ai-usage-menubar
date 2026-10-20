@@ -56,6 +56,25 @@ enum MenuBarStatusImageRenderer {
         for groups: [MenuBarProviderReadings],
         font: NSFont
     ) -> NSImage {
+        if groups.contains(where: \.isStacked) {
+            let images = groups.map { group in
+                group.isStacked ? stackedImage(for: group) : image(for: [group], font: font)
+            }
+            let width = images.map(\.size.width).reduce(0, +) +
+                providerSpacing * CGFloat(max(images.count - 1, 0))
+            let height = images.map(\.size.height).max() ?? iconSize
+            let result = NSImage(size: NSSize(width: width, height: height), flipped: false) { rect in
+                var x: CGFloat = 0
+                for image in images {
+                    image.draw(at: NSPoint(x: x, y: rect.midY - image.size.height / 2),
+                               from: .zero, operation: .sourceOver, fraction: 1)
+                    x += image.size.width + providerSpacing
+                }
+                return true
+            }
+            result.isTemplate = true
+            return result
+        }
         let microFont = NSFont.systemFont(
             ofSize: max(8, floor(font.pointSize * 0.62)),
             weight: .semibold
@@ -223,6 +242,42 @@ enum MenuBarStatusImageRenderer {
         }
         image.isTemplate = true
         return image
+    }
+
+    private static func stackedImage(for group: MenuBarProviderReadings) -> NSImage {
+        let presentation = MenuBarProviderPresentation(group: group)
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.black]
+        let rows = presentation.metrics.map { metric in
+            let text = (metric.label.map { "\($0) " } ?? "") + metric.valueText +
+                (metric.showsStaleIndicator ? " ⚠︎" : "")
+            return textRun(text, font: font)
+        }
+        // Two rows per column keep the status item within the menu bar's height.
+        let columns = stride(from: 0, to: rows.count, by: 2).map { index in
+            Array(rows[index..<min(index + 2, rows.count)])
+        }
+        let widths = columns.map { $0.map(\.width).max() ?? 0 }
+        let width = iconSize + (rows.isEmpty ? 0 : iconTextSpacing + widths.reduce(0, +) +
+            4 * CGFloat(max(columns.count - 1, 0)))
+        let height: CGFloat = rows.count > 1 ? 22 : iconSize
+        let result = NSImage(size: NSSize(width: width, height: height), flipped: false) { rect in
+            icon(for: group.provider).draw(in: NSRect(x: 0, y: rect.midY - iconSize / 2,
+                                                       width: iconSize, height: iconSize),
+                                           from: .zero, operation: .sourceOver, fraction: 1)
+            var x = iconSize + iconTextSpacing
+            for (index, column) in columns.enumerated() {
+                for (rowIndex, row) in column.enumerated() {
+                    let center = column.count == 1 ? rect.midY : (rowIndex == 0 ? 16.5 : 5.5)
+                    (row.text as NSString).draw(at: NSPoint(x: x, y: center - row.size.height / 2),
+                                                withAttributes: attributes)
+                }
+                x += widths[index] + 4
+            }
+            return true
+        }
+        result.isTemplate = true
+        return result
     }
 
     private static func textRun(_ text: String, font: NSFont) -> TextRun {
@@ -399,18 +454,23 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             )
         }
 
-        let hostingController = NSHostingController(rootView: rootView)
+        let screen = statusItem?.button?.window?.screen ?? NSScreen.main
+        // Reserve room for the popover arrow and a small gap above the Dock.
+        let maximumHeight = max(240, floor((screen?.visibleFrame.height ?? 924) - 24))
+        let hostingController = NSHostingController(rootView:
+            rootView.environment(\.menuBarPanelMaximumHeight, maximumHeight)
+        )
         hostingController.sizingOptions = [.preferredContentSize]
 
         let measuredSize = hostingController.sizeThatFits(
             in: NSSize(
                 width: route.width,
-                height: .greatestFiniteMagnitude
+                height: maximumHeight
             )
         )
         let contentSize = NSSize(
             width: route.width,
-            height: ceil(measuredSize.height)
+            height: min(ceil(measuredSize.height), maximumHeight)
         )
         hostingController.preferredContentSize = contentSize
         popover.contentViewController = hostingController
@@ -445,7 +505,10 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             (
                 groups: store.menuBarProviderReadings(
                     for: preferences.menuBarProviderConfigurations,
-                    displayMode: preferences.usageDisplayMode
+                    displayMode: preferences.usageDisplayMode,
+                    limitDisplay: preferences.menuBarLimitDisplay,
+                    showsPercentSign: preferences.showsMenuBarPercentSign,
+                    showsSessionWeeklyLabels: preferences.showsMenuBarSessionWeeklyLabels
                 ),
                 trackedProviders: preferences.trackedProviderIDs,
                 refreshInterval: preferences.refreshInterval

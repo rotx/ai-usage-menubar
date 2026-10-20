@@ -8,6 +8,7 @@ enum ProviderID: String, CaseIterable, Codable, Identifiable, Sendable {
     case copilot
     case devin
     case grok
+    case muse
 
     var id: Self { self }
 
@@ -19,6 +20,7 @@ enum ProviderID: String, CaseIterable, Codable, Identifiable, Sendable {
         case .antigravity: "Antigravity"
         case .copilot: "GitHub Copilot"
         case .devin: "Devin"
+        case .muse: "Muse Code"
         case .grok: "Grok"
         }
     }
@@ -31,6 +33,7 @@ enum ProviderID: String, CaseIterable, Codable, Identifiable, Sendable {
         case .antigravity: "ProviderAntigravity"
         case .copilot: "ProviderCopilot"
         case .devin: "ProviderDevin"
+        case .muse: "ProviderMuse"
         case .grok: "ProviderGrok"
         }
     }
@@ -54,6 +57,7 @@ enum ProviderID: String, CaseIterable, Codable, Identifiable, Sendable {
         case .antigravity: ["antigravity", "agy"]
         case .copilot: ["copilot", "github-copilot"]
         case .devin: ["devin"]
+        case .muse: ["muse"]
         case .grok: ["grok"]
         }
     }
@@ -88,6 +92,8 @@ enum ProviderID: String, CaseIterable, Codable, Identifiable, Sendable {
                 "~/Applications/Devin.app",
                 "~/Library/Application Support/Devin"
             ]
+        case .muse:
+            ["~/.config/muse/auth.json", "~/.local/bin/muse"]
         case .grok:
             ["~/.grok"]
         }
@@ -97,7 +103,7 @@ enum ProviderID: String, CaseIterable, Codable, Identifiable, Sendable {
         switch self {
         case .cursor: .totalUsage
         case .copilot: .credits
-        case .claude, .codex, .antigravity, .devin, .grok: .weekly
+        case .claude, .codex, .antigravity, .devin, .grok, .muse: .weekly
         }
     }
 }
@@ -599,4 +605,23 @@ protocol DateProviding: Sendable {
 
 struct SystemDateProvider: DateProviding {
     func now() -> Date { Date() }
+}
+
+/// Selected preserves manual metric choices; other modes include available session/weekly limits.
+enum MenuBarLimitDisplay: String, CaseIterable, Identifiable, Sendable {
+    case selected
+    case automatic
+    case both
+    case stacked
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .selected: "Selected metrics"
+        case .automatic: "Auto"
+        case .both: "Side by side"
+        case .stacked: "Stacked"
+        }
+    }
 }

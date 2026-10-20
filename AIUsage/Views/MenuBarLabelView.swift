@@ -5,12 +5,12 @@ struct MenuBarPresentation: Equatable, Sendable {
     let accessibilityLabel: String
     let showsStaleIndicator: Bool
 
-    init(reading: MenuBarReading) {
+    init(reading: MenuBarReading, showsPercentSign: Bool = true) {
         let provider = reading.provider.displayName
         let subject = "\(provider) \(reading.metric.title)"
         switch reading.value {
         case .percentage(let percent):
-            valueText = "\(Int(percent.rounded()))%"
+            valueText = "\(Int(percent.rounded()))" + (showsPercentSign ? "%" : "")
             let value =
                 "\(Int(percent.rounded())) percent \(reading.displayMode.valueSuffix)"
             accessibilityLabel = reading.isStale
@@ -51,7 +51,7 @@ struct MenuBarReadingsPresentation: Equatable, Sendable {
     let accessibilityLabel: String
 
     init(readings: [MenuBarReading]) {
-        items = readings.map(MenuBarPresentation.init(reading:))
+        items = readings.map { MenuBarPresentation(reading: $0) }
         accessibilityLabel = items.isEmpty
             ? "AI usage"
             : items.map(\.accessibilityLabel).joined(separator: ", ")
@@ -60,7 +60,7 @@ struct MenuBarReadingsPresentation: Equatable, Sendable {
     init(groups: [MenuBarProviderReadings]) {
         items = groups
             .flatMap(\.readings)
-            .map(MenuBarPresentation.init(reading:))
+            .map { MenuBarPresentation(reading: $0) }
         guard !groups.isEmpty else {
             accessibilityLabel = "AI usage"
             return
@@ -70,7 +70,7 @@ struct MenuBarReadingsPresentation: Equatable, Sendable {
                 return "\(group.provider.displayName), no usage data"
             }
             return group.readings
-                .map(MenuBarPresentation.init(reading:))
+                .map { MenuBarPresentation(reading: $0) }
                 .map(\.accessibilityLabel)
                 .joined(separator: ", ")
         }.joined(separator: ", ")
@@ -91,6 +91,8 @@ struct MenuBarProviderPresentation: Equatable, Sendable {
     init(group: MenuBarProviderReadings) {
         provider = group.provider
         let sharesPercentageSuffix =
+            group.showsPercentSign &&
+            !group.isStacked &&
             group.showsMetricLabels &&
             !group.readings.isEmpty &&
             group.readings.allSatisfy { reading in
@@ -101,7 +103,7 @@ struct MenuBarProviderPresentation: Equatable, Sendable {
             }
 
         metrics = group.readings.compactMap { reading in
-            let presentation = MenuBarPresentation(reading: reading)
+            let presentation = MenuBarPresentation(reading: reading, showsPercentSign: group.showsPercentSign)
             guard var valueText = presentation.valueText,
                   !valueText.isEmpty else {
                 return nil
@@ -113,9 +115,10 @@ struct MenuBarProviderPresentation: Equatable, Sendable {
             }
 
             return MenuBarMetricPresentation(
-                label: group.showsMetricLabels
-                    ? reading.metric.compactLabel
-                    : nil,
+                label: group.showsMetricLabels && (
+                    group.showsSessionWeeklyLabels ||
+                    (reading.metric != .session && reading.metric != .weekly)
+                ) ? reading.metric.compactLabel : nil,
                 valueText: valueText,
                 showsStaleIndicator:
                     presentation.showsStaleIndicator
@@ -132,61 +135,69 @@ struct MenuBarProviderLabelView: View {
     var body: some View {
         let presentation = MenuBarProviderPresentation(group: group)
 
-        HStack(spacing: 4) {
-            ProviderIcon(provider: group.provider, size: 15)
+        if group.isStacked {
+            Image(nsImage: MenuBarStatusImageRenderer.image(
+                for: [group],
+                font: .menuBarFont(ofSize: 0)
+            ))
+            .accessibilityLabel(MenuBarReadingsPresentation(groups: [group]).accessibilityLabel)
+        } else {
+            HStack(spacing: 4) {
+                ProviderIcon(provider: group.provider, size: 15)
 
-            HStack(spacing: 0) {
-                ForEach(
-                    Array(presentation.metrics.enumerated()),
-                    id: \.offset
-                ) { index, metric in
-                    if index > 0 {
-                        Text("·")
-                            .font(.system(
-                                size: microFontSize,
-                                weight: .semibold
-                            ))
-                            .padding(.horizontal, 3)
-                    }
+                HStack(spacing: 0) {
+                    ForEach(
+                        Array(presentation.metrics.enumerated()),
+                        id: \.offset
+                    ) { index, metric in
+                        if index > 0 {
+                            Text("·")
+                                .font(.system(
+                                    size: microFontSize,
+                                    weight: .semibold
+                                ))
+                                .padding(.horizontal, 3)
+                        }
 
-                    if let label = metric.label {
-                        Text(label)
-                            .font(.system(
-                                size: microFontSize,
-                                weight: .semibold
-                            ))
-                            .baselineOffset(2)
-                            .padding(.trailing, 1)
-                    }
+                        if let label = metric.label {
+                            Text(label)
+                                .font(.system(
+                                    size: microFontSize,
+                                    weight: .semibold
+                                ))
+                                .baselineOffset(2)
+                                .padding(.trailing, 1)
+                        }
 
-                    Text(metric.valueText)
-                        .monospacedDigit()
+                        Text(metric.valueText)
+                            .monospacedDigit()
 
-                    if index == presentation.metrics.count - 1,
-                       let suffix = presentation.sharedSuffix {
-                        Text(suffix)
-                            .font(.system(
-                                size: microFontSize,
-                                weight: .semibold
-                            ))
-                            .padding(.leading, 1)
-                    }
+                        if index == presentation.metrics.count - 1,
+                           let suffix = presentation.sharedSuffix {
+                            Text(suffix)
+                                .font(.system(
+                                    size: microFontSize,
+                                    weight: .semibold
+                                ))
+                                .padding(.leading, 1)
+                        }
 
-                    if metric.showsStaleIndicator {
-                        Text("⚠︎")
-                            .font(.system(
-                                size: microFontSize,
-                                weight: .semibold
-                            ))
-                            .padding(.leading, 1)
+                        if metric.showsStaleIndicator {
+                            Text("⚠︎")
+                                .font(.system(
+                                    size: microFontSize,
+                                    weight: .semibold
+                                ))
+                                .padding(.leading, 1)
+                        }
                     }
                 }
             }
+            .accessibilityLabel(
+                MenuBarReadingsPresentation(
+                    groups: [group]
+                ).accessibilityLabel
+            )
         }
-        .accessibilityLabel(
-            MenuBarReadingsPresentation(
-                groups: [group]
-            ).accessibilityLabel
-        )
     }
 }

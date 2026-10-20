@@ -7,13 +7,18 @@ struct SettingsView: View {
     @Bindable var launchAtLogin: LaunchAtLoginController
     @Bindable var updateController: UpdateController
     var showDashboard: @MainActor () -> Void = {}
+    @Environment(\.menuBarPanelMaximumHeight) private var maximumPanelHeight
 
     var body: some View {
         GlassEffectContainer(spacing: 10) {
             VStack(alignment: .leading, spacing: 16) {
                 header
-                providersSection
-                generalSection
+                AdaptiveScrollView(maximumHeight: max(120, maximumPanelHeight - 120)) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        providersSection
+                        generalSection
+                    }
+                }
                 footer
             }
         }
@@ -145,6 +150,41 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                     .labelsHidden()
                     .frame(width: 130)
+                }
+
+                GridRow(alignment: .top) {
+                    Text("Menu bar limits")
+                        .foregroundStyle(.secondary)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Picker("Menu bar limits", selection: $preferences.menuBarLimitDisplay) {
+                            ForEach(MenuBarLimitDisplay.allCases) { mode in
+                                Text(mode.title).tag(mode)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 180, alignment: .leading)
+                        Text("Auto shows the selected session or weekly limit with the most usage. Side by side and Stacked show both. Other metrics follow your selections.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                GridRow {
+                    Text("Percent signs")
+                        .foregroundStyle(.secondary)
+                    Toggle("Show % in menu bar", isOn: $preferences.showsMenuBarPercentSign)
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                }
+
+                GridRow {
+                    Text("Limit labels")
+                        .foregroundStyle(.secondary)
+                    Toggle("Show S / W in menu bar", isOn: $preferences.showsMenuBarSessionWeeklyLabels)
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
                 }
 
                 GridRow {
@@ -399,6 +439,7 @@ private struct ProviderStatusView: View {
             .foregroundStyle(presentation.color)
             .labelStyle(.titleAndIcon)
             .accessibilityLabel(presentation.text)
+            .help(state?.failure?.message ?? presentation.text)
     }
 }
 
@@ -432,7 +473,11 @@ private struct ProviderStatusPresentation {
                 text = "Rate limited"
                 systemImage = "hourglass"
                 color = .orange
-            case .transient, .invalidResponse, .storage:
+            case .storage:
+                text = "Credential access failed"
+                systemImage = "lock.trianglebadge.exclamationmark"
+                color = .orange
+            case .transient, .invalidResponse:
                 text = state.snapshot == nil
                     ? "Temporarily unavailable"
                     : "Showing last update"

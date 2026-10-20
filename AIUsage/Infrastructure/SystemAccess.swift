@@ -22,6 +22,8 @@ final class LoginShellEnvironment: @unchecked Sendable {
     private static let supportedNames = [
         "CLAUDE_CONFIG_DIR",
         "CODEX_HOME",
+        "MUSE_AUTH_PATH",
+        "XDG_CONFIG_HOME",
         "PATH"
     ]
     private static let beginMarker = "__AIUSAGE_ENV_BEGIN__"
@@ -122,6 +124,11 @@ struct SystemProviderAvailabilityChecker: ProviderAvailabilityChecking {
 
             return Set(ProviderID.allCases.filter { provider in
                 let descriptor = provider.descriptor
+                if provider == .muse {
+                    let authPath = environment.value(for: "MUSE_AUTH_PATH") ??
+                        environment.value(for: "XDG_CONFIG_HOME").map { "\($0)/muse/auth.json" }
+                    if let authPath, Self.fileExists(at: authPath) { return true }
+                }
                 return descriptor.executableNames.contains {
                     Self.containsExecutable(named: $0, searchPath: path)
                 } || descriptor.installationIndicators.contains {
@@ -243,6 +250,7 @@ struct LocalTextFileAccessor: TextFileAccessing {
 protocol KeychainAccessing: Sendable {
     func readGenericPassword(service: String) throws -> String?
     func writeGenericPassword(service: String, value: String) throws
+    func readGenericPassword(service: String, account: String) throws -> String?
     func readGenericPasswordForCurrentUser(service: String) throws -> String?
     func writeGenericPasswordForCurrentUser(service: String, value: String) throws
 }
@@ -250,13 +258,22 @@ protocol KeychainAccessing: Sendable {
 struct SecurityKeychainAccessor: KeychainAccessing {
     private static let itemNotFoundExitCode: Int32 = 44
     let processRunner: ProcessRunning
+    private let readTimeout: TimeInterval
 
-    init(processRunner: ProcessRunning = SystemProcessRunner()) {
+    init(
+        processRunner: ProcessRunning = SystemProcessRunner(),
+        readTimeout: TimeInterval = 5
+    ) {
         self.processRunner = processRunner
+        self.readTimeout = readTimeout
     }
 
     func readGenericPassword(service: String) throws -> String? {
         try readPassword(["find-generic-password", "-s", service, "-w"])
+    }
+
+    func readGenericPassword(service: String, account: String) throws -> String? {
+        try readPassword(["find-generic-password", "-s", service, "-a", account, "-w"])
     }
 
     func readGenericPasswordForCurrentUser(service: String) throws -> String? {
@@ -287,7 +304,7 @@ struct SecurityKeychainAccessor: KeychainAccessing {
             executable: "/usr/bin/security",
             arguments: arguments,
             environment: [:],
-            timeout: 5
+            timeout: readTimeout
         )
         guard result.succeeded else {
             if result.exitCode == Self.itemNotFoundExitCode { return nil }

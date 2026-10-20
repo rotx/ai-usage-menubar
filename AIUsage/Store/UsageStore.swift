@@ -27,9 +27,15 @@ struct MenuBarProviderReadings: Equatable, Identifiable, Sendable {
     let provider: ProviderID
     let selectedMetrics: [MenuBarMetricID]
     let readings: [MenuBarReading]
+    var isStacked = false
+    var showsPercentSign = true
+    var showsSessionWeeklyLabels = true
+    var showsAutomaticLimitLabel = false
 
     var id: ProviderID { provider }
-    var showsMetricLabels: Bool { selectedMetrics.count > 1 }
+    var showsMetricLabels: Bool {
+        selectedMetrics.count > 1 || showsAutomaticLimitLabel
+    }
 }
 
 @MainActor
@@ -56,7 +62,8 @@ final class UsageStore {
             AntigravityProvider(),
             CopilotProvider(),
             DevinProvider(),
-            GrokProvider()
+            GrokProvider(),
+            MuseProvider()
         ],
         availabilityChecker: any ProviderAvailabilityChecking =
             SystemProviderAvailabilityChecker(),
@@ -245,7 +252,10 @@ final class UsageStore {
 
     func menuBarProviderReadings(
         for configurations: [MenuBarProviderConfiguration],
-        displayMode: UsageDisplayMode = .used
+        displayMode: UsageDisplayMode = .used,
+        limitDisplay: MenuBarLimitDisplay = .selected,
+        showsPercentSign: Bool = true,
+        showsSessionWeeklyLabels: Bool = true
     ) -> [MenuBarProviderReadings] {
         configurations.compactMap { configuration in
             guard trackedProviderIDs.contains(configuration.provider),
@@ -254,7 +264,26 @@ final class UsageStore {
                 return nil
             }
 
-            let items = configuration.metrics.map {
+            var metrics = configuration.metrics
+            if limitDisplay != .selected, let snapshot = state.snapshot {
+                let limits: [MenuBarMetricID] = [.session, .weekly]
+                let available = limits.filter {
+                    snapshot.window(for: $0) != nil &&
+                    (limitDisplay != .automatic || configuration.metrics.contains($0))
+                }
+                // Only providers with a session/weekly quota participate. Other selections stay intact.
+                if !available.isEmpty {
+                    var displayed = available
+                    if limitDisplay == .automatic,
+                       let mostUsed = snapshot.windows
+                        .filter({ available.contains($0.kind.menuBarMetric) })
+                        .max(by: { $0.usedPercent < $1.usedPercent }) {
+                        displayed = [mostUsed.kind.menuBarMetric]
+                    }
+                    metrics = displayed + metrics.filter { !limits.contains($0) }
+                }
+            }
+            let items = metrics.map {
                 MenuBarItemID(
                     provider: configuration.provider,
                     metric: $0
@@ -262,11 +291,17 @@ final class UsageStore {
             }
             return MenuBarProviderReadings(
                 provider: configuration.provider,
-                selectedMetrics: configuration.metrics,
+                selectedMetrics: metrics,
                 readings: menuBarReadings(
                     for: items,
                     displayMode: displayMode
-                )
+                ),
+                isStacked: limitDisplay == .stacked && metrics.count > 1,
+                showsPercentSign: showsPercentSign,
+                showsSessionWeeklyLabels: showsSessionWeeklyLabels,
+                showsAutomaticLimitLabel: limitDisplay == .automatic &&
+                    configuration.metrics.contains(.session) &&
+                    configuration.metrics.contains(.weekly)
             )
         }
     }

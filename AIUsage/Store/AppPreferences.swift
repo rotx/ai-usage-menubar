@@ -60,6 +60,24 @@ final class AppPreferences {
         }
     }
 
+    var menuBarLimitDisplay: MenuBarLimitDisplay {
+        didSet {
+            defaults.set(menuBarLimitDisplay.rawValue, forKey: Key.menuBarLimitDisplay)
+        }
+    }
+
+    var showsMenuBarPercentSign: Bool {
+        didSet {
+            defaults.set(showsMenuBarPercentSign, forKey: Key.showsMenuBarPercentSign)
+        }
+    }
+
+    var showsMenuBarSessionWeeklyLabels: Bool {
+        didSet {
+            defaults.set(showsMenuBarSessionWeeklyLabels, forKey: Key.showsMenuBarSessionWeeklyLabels)
+        }
+    }
+
     var refreshInterval: RefreshIntervalOption {
         didSet {
             defaults.set(refreshInterval.rawValue, forKey: Key.refreshInterval)
@@ -86,6 +104,11 @@ final class AppPreferences {
            defaults.object(forKey: Key.openUsageProvidersAdded) == nil {
             initialTrackedProviders.formUnion(Self.openUsageProviders)
         }
+        if restoredProviders != nil,
+           defaults.object(forKey: Key.museProviderAdded) == nil {
+            initialTrackedProviders.insert(.muse)
+        }
+        defaults.set(true, forKey: Key.museProviderAdded)
         trackedProviderIDs = initialTrackedProviders
         defaults.set(true, forKey: Key.openUsageProvidersAdded)
 
@@ -163,6 +186,14 @@ final class AppPreferences {
             forKey: Key.usageDisplayMode,
             in: defaults
         ) ?? .defaultSelection
+        menuBarLimitDisplay = Self.value(
+            MenuBarLimitDisplay.self,
+            forKey: Key.menuBarLimitDisplay,
+            in: defaults
+        ) ?? .selected
+        showsMenuBarPercentSign = defaults.object(forKey: Key.showsMenuBarPercentSign) as? Bool ?? true
+        showsMenuBarSessionWeeklyLabels =
+            defaults.object(forKey: Key.showsMenuBarSessionWeeklyLabels) as? Bool ?? true
         refreshInterval = Self.value(
             RefreshIntervalOption.self,
             forKey: Key.refreshInterval,
@@ -464,5 +495,9 @@ final class AppPreferences {
         static let menuBarWindow = "menuBarWindow"
         static let usageDisplayMode = "usageDisplayMode"
         static let refreshInterval = "refreshInterval"
+        static let menuBarLimitDisplay = "menuBarLimitDisplay.v1"
+        static let showsMenuBarPercentSign = "showsMenuBarPercentSign.v1"
+        static let showsMenuBarSessionWeeklyLabels = "showsMenuBarSessionWeeklyLabels.v1"
+        static let museProviderAdded = "museProviderAdded.v1"
     }
 }

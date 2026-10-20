@@ -59,6 +59,7 @@ final class MemoryKeychain: KeychainAccessing, @unchecked Sendable {
     private var currentUser: [String: String]
     private(set) var genericReads: [String] = []
     private(set) var currentUserReads: [String] = []
+    private(set) var accountReads: [(service: String, account: String)] = []
 
     init(
         generic: [String: String] = [:],
@@ -77,6 +78,13 @@ final class MemoryKeychain: KeychainAccessing, @unchecked Sendable {
 
     func writeGenericPassword(service: String, value: String) throws {
         lock.withLock { generic[service] = value }
+    }
+
+    func readGenericPassword(service: String, account: String) throws -> String? {
+        lock.withLock {
+            accountReads.append((service, account))
+            return generic[service]
+        }
     }
 
     func readGenericPasswordForCurrentUser(service: String) throws -> String? {
