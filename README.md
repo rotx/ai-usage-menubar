@@ -75,9 +75,10 @@ the menu bar rather than the Dock. macOS 26 or newer is required.
 - Claude Code extra usage and Codex credits when available
 - Remaining or used percentages, switchable directly in the panel
 - Independent menu bar controls and metric choices for each provider
+- Provider order in Settings, used by the usage panel and the menu bar
 - Auto, side-by-side, and stacked session/weekly display, with optional percent signs
 - Configurable 1, 5, 15, 30, or 60-minute refresh and one-click manual refresh
-- Signed update checks at launch and daily, plus **Check for Updates…**
+- Optional signed update checks at launch and once a day, plus **Check for Updates…**
 - A direct **Update** button in the panel when a new version is available
 - Provider cards only for installed tools, with signed-out status kept visible
 - Native light and dark appearances with Liquid Glass
@@ -125,7 +126,10 @@ The exact researched contracts are documented in
 
 ## Menu bar behavior
 
-Every provider can be shown or hidden independently. Under each provider,
+Every provider can be shown or hidden independently. In Settings, click the
+menu button at the top right of the provider list, then drag a provider to
+its new position. That order is the order in the usage panel and the menu bar.
+Under each provider,
 choose any metric it currently returns. A single metric shows only its value;
 multiple metrics use tiny labels to stay compact. **Weekly** is selected for
 Claude Code and Codex by default, and **Left** is the default number mode.
@@ -148,6 +152,10 @@ limit show that limit. **Show % in menu bar** controls percent signs; accessible
 labels still announce the units. Turn off **Show S / W in menu bar** under
 **Limit labels** to hide the session and weekly prefixes in either layout;
 other metric labels remain visible.
+
+**Automatic update checks**, at the bottom of Settings, controls the launch and
+daily check for `appcast.xml`. Turn it off to skip that request. **Check for
+Updates…** still checks when you ask.
 
 Muse Code reuses `muse login` credentials from its auth file or macOS Keychain.
 It needs a subscription login, rather than a Model API inference key. Meta may

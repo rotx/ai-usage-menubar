@@ -78,6 +78,24 @@ final class AppPreferences {
         }
     }
 
+    private(set) var providerOrder: [ProviderID] {
+        didSet {
+            defaults.set(
+                Self.encode(providerOrder),
+                forKey: Key.providerOrder
+            )
+        }
+    }
+
+    var automaticallyChecksForUpdates: Bool {
+        didSet {
+            defaults.set(
+                automaticallyChecksForUpdates,
+                forKey: Key.automaticallyChecksForUpdates
+            )
+        }
+    }
+
     var refreshInterval: RefreshIntervalOption {
         didSet {
             defaults.set(refreshInterval.rawValue, forKey: Key.refreshInterval)
@@ -194,6 +212,9 @@ final class AppPreferences {
         showsMenuBarPercentSign = defaults.object(forKey: Key.showsMenuBarPercentSign) as? Bool ?? true
         showsMenuBarSessionWeeklyLabels =
             defaults.object(forKey: Key.showsMenuBarSessionWeeklyLabels) as? Bool ?? true
+        providerOrder = Self.normalizedProviderOrder(in: defaults)
+        automaticallyChecksForUpdates =
+            defaults.object(forKey: Key.automaticallyChecksForUpdates) as? Bool ?? true
         refreshInterval = Self.value(
             RefreshIntervalOption.self,
             forKey: Key.refreshInterval,
@@ -207,7 +228,7 @@ final class AppPreferences {
     }
 
     var menuBarProviderConfigurations: [MenuBarProviderConfiguration] {
-        ProviderID.allCases.compactMap { provider in
+        providerOrder.compactMap { provider in
             guard visibleMenuBarProviderIDs.contains(provider) else {
                 return nil
             }
@@ -216,6 +237,20 @@ final class AppPreferences {
                 metrics: selectedMenuBarMetrics(for: provider)
             )
         }
+    }
+
+    func moveProvider(_ provider: ProviderID, by offset: Int) {
+        guard offset != 0,
+              let index = providerOrder.firstIndex(of: provider) else {
+            return
+        }
+        let destination = index + offset
+        guard providerOrder.indices.contains(destination) else { return }
+
+        var order = providerOrder
+        order.remove(at: index)
+        order.insert(provider, at: destination)
+        providerOrder = order
     }
 
     func isTracking(_ provider: ProviderID) -> Bool {
@@ -355,6 +390,29 @@ final class AppPreferences {
         .devin,
         .grok
     ]
+
+    private static func normalizedProviderOrder(
+        in defaults: UserDefaults
+    ) -> [ProviderID] {
+        let stored = decode(
+            [String].self,
+            forKey: Key.providerOrder,
+            in: defaults
+        ) ?? []
+        var seen: Set<ProviderID> = []
+        var order: [ProviderID] = []
+        for rawValue in stored {
+            guard let provider = ProviderID(rawValue: rawValue),
+                  seen.insert(provider).inserted else {
+                continue
+            }
+            order.append(provider)
+        }
+        for provider in ProviderID.allCases where seen.insert(provider).inserted {
+            order.append(provider)
+        }
+        return order
+    }
 
     private static func hasLegacyInstallation(
         in defaults: UserDefaults
@@ -498,6 +556,23 @@ final class AppPreferences {
         static let menuBarLimitDisplay = "menuBarLimitDisplay.v1"
         static let showsMenuBarPercentSign = "showsMenuBarPercentSign.v1"
         static let showsMenuBarSessionWeeklyLabels = "showsMenuBarSessionWeeklyLabels.v1"
+        static let providerOrder = "providerOrder.v1"
+        static let automaticallyChecksForUpdates = "automaticallyChecksForUpdates.v1"
         static let museProviderAdded = "museProviderAdded.v1"
+    }
+}
+
+enum ProviderReorderMath {
+    static func targetIndex(
+        start: Int,
+        translation: CGFloat,
+        stride: CGFloat,
+        count: Int
+    ) -> Int {
+        guard count > 0 else { return 0 }
+        let boundedStart = min(max(0, start), count - 1)
+        guard stride > 1 else { return boundedStart }
+        let steps = Int((translation / stride).rounded())
+        return min(max(0, boundedStart + steps), count - 1)
     }
 }

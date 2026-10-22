@@ -581,6 +581,7 @@ private struct DashboardRootView: View {
             refreshInterval: $preferences.refreshInterval,
             availableUpdateVersion: updateController.availableVersion,
             isCheckingForUpdates: updateController.isChecking,
+            providerOrder: preferences.providerOrder,
             checkForUpdates: updateController.checkForUpdates,
             openSettings: openSettings
         )

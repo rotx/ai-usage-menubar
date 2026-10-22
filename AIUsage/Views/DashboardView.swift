@@ -8,6 +8,7 @@ struct DashboardView: View {
     @Binding var refreshInterval: RefreshIntervalOption
     let availableUpdateVersion: String?
     let isCheckingForUpdates: Bool
+    var providerOrder: [ProviderID] = ProviderID.allCases
     var checkForUpdates: @MainActor () -> Void = {}
     var openSettings: @MainActor () -> Void = {}
 
@@ -15,7 +16,8 @@ struct DashboardView: View {
         GlassEffectContainer(spacing: 10) {
             DashboardContentView(
                 store: store,
-                usageDisplayMode: $usageDisplayMode
+                usageDisplayMode: $usageDisplayMode,
+                providerOrder: providerOrder
             )
                 .safeAreaBar(edge: .bottom, spacing: 0) {
                     footer
@@ -146,6 +148,7 @@ struct DashboardContentView: View {
     @Environment(\.menuBarPanelMaximumHeight) private var maximumPanelHeight
     @Bindable var store: UsageStore
     @Binding var usageDisplayMode: UsageDisplayMode
+    var providerOrder: [ProviderID] = ProviderID.allCases
 
     var body: some View {
         VStack(spacing: 8) {
@@ -176,7 +179,7 @@ struct DashboardContentView: View {
     }
 
     private var visibleProviders: [ProviderID] {
-        ProviderID.allCases.filter(store.isProviderVisibleInDashboard)
+        providerOrder.filter(store.isProviderVisibleInDashboard)
     }
 
     private var header: some View {

@@ -9,19 +9,41 @@ final class UpdateController: NSObject, SPUUpdaterDelegate {
 
     @ObservationIgnored
     private var updaterController: SPUStandardUpdaterController!
+    @ObservationIgnored
+    private let didStartUpdater: Bool
 
-    init(startingUpdater: Bool = true) {
+    init(
+        startingUpdater: Bool = true,
+        automaticallyChecksForUpdates: Bool = true
+    ) {
+        didStartUpdater = startingUpdater
         super.init()
+        // Apply the preference before Sparkle starts, so a disabled check
+        // never schedules the launch or daily appcast fetch.
         updaterController = SPUStandardUpdaterController(
-            startingUpdater: startingUpdater,
+            startingUpdater: false,
             updaterDelegate: self,
             userDriverDelegate: nil
         )
+        guard startingUpdater else { return }
 
-        if startingUpdater {
-            isChecking = true
-            updaterController.updater.checkForUpdateInformation()
-        }
+        updaterController.updater.automaticallyChecksForUpdates =
+            automaticallyChecksForUpdates
+        updaterController.startUpdater()
+        guard automaticallyChecksForUpdates else { return }
+
+        isChecking = true
+        updaterController.updater.checkForUpdateInformation()
+    }
+
+    func setAutomaticallyChecksForUpdates(_ enabled: Bool) {
+        guard didStartUpdater else { return }
+
+        updaterController.updater.automaticallyChecksForUpdates = enabled
+        guard enabled else { return }
+
+        isChecking = true
+        updaterController.updater.checkForUpdateInformation()
     }
 
     var isUpdateAvailable: Bool {

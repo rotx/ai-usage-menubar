@@ -34,6 +34,8 @@ final class AppPreferencesTests: XCTestCase {
         XCTAssertFalse(preferences.hasCompletedInitialSetup)
         XCTAssertEqual(preferences.usageDisplayMode, .remaining)
         XCTAssertEqual(preferences.refreshInterval, .fiveMinutes)
+        XCTAssertEqual(preferences.providerOrder, ProviderID.allCases)
+        XCTAssertTrue(preferences.automaticallyChecksForUpdates)
     }
 
     @MainActor
@@ -124,6 +126,8 @@ final class AppPreferencesTests: XCTestCase {
         )
         preferences.usageDisplayMode = .used
         preferences.refreshInterval = .thirtyMinutes
+        preferences.automaticallyChecksForUpdates = false
+        preferences.moveProvider(.codex, by: -1)
         preferences.markInitialSetupCompleted()
 
         let restored = AppPreferences(defaults: defaults)
@@ -135,6 +139,8 @@ final class AppPreferencesTests: XCTestCase {
         )
         XCTAssertEqual(restored.usageDisplayMode, .used)
         XCTAssertEqual(restored.refreshInterval, .thirtyMinutes)
+        XCTAssertFalse(restored.automaticallyChecksForUpdates)
+        XCTAssertEqual(restored.providerOrder.first, .codex)
         XCTAssertTrue(restored.hasCompletedInitialSetup)
     }
 
@@ -460,6 +466,80 @@ final class AppPreferencesTests: XCTestCase {
 
         XCTAssertFalse(laterRun.isTracking(.grok))
         XCTAssertTrue(laterRun.isTracking(.cursor))
+    }
+
+    @MainActor
+    func testProviderOrderControlsMenuBarAndIgnoresUnknownEntries() throws {
+        defaults.set(
+            try JSONEncoder().encode([
+                "grok",
+                "not-a-provider",
+                "grok",
+                "claude"
+            ]),
+            forKey: "providerOrder.v1"
+        )
+
+        let preferences = AppPreferences(defaults: defaults)
+        preferences.configureDefaultMenuBarProviders(
+            availableItemsByProvider: availableItemsByProvider
+        )
+        preferences.setMenuBarVisibility(
+            true,
+            for: .grok,
+            availableItems: [
+                MenuBarItemID(provider: .grok, metric: .weekly)
+            ]
+        )
+
+        XCTAssertEqual(preferences.providerOrder.first, .grok)
+        XCTAssertEqual(preferences.providerOrder.dropFirst().first, .claude)
+        XCTAssertEqual(
+            Set(preferences.providerOrder),
+            Set(ProviderID.allCases)
+        )
+        XCTAssertEqual(
+            preferences.providerOrder.filter { $0 == .grok }.count,
+            1
+        )
+        XCTAssertEqual(
+            preferences.menuBarProviderConfigurations.map(\.provider),
+            [.grok, .claude, .codex]
+        )
+
+        let count = preferences.providerOrder.count
+        preferences.moveProvider(.grok, by: -1)
+        preferences.moveProvider(.muse, by: 1)
+        XCTAssertEqual(preferences.providerOrder.count, count)
+        XCTAssertEqual(preferences.providerOrder.first, .grok)
+        XCTAssertEqual(preferences.providerOrder.last, .muse)
+    }
+
+    func testReorderDragTargetsTheRowUnderThePointer() {
+        XCTAssertEqual(
+            ProviderReorderMath.targetIndex(start: 1, translation: 0, stride: 50, count: 8),
+            1
+        )
+        XCTAssertEqual(
+            ProviderReorderMath.targetIndex(start: 1, translation: 80, stride: 50, count: 8),
+            3
+        )
+        XCTAssertEqual(
+            ProviderReorderMath.targetIndex(start: 3, translation: -120, stride: 50, count: 8),
+            1
+        )
+        XCTAssertEqual(
+            ProviderReorderMath.targetIndex(start: 1, translation: 10_000, stride: 50, count: 8),
+            7
+        )
+        XCTAssertEqual(
+            ProviderReorderMath.targetIndex(start: 2, translation: -10_000, stride: 50, count: 8),
+            0
+        )
+        XCTAssertEqual(
+            ProviderReorderMath.targetIndex(start: 2, translation: 40, stride: 0, count: 8),
+            2
+        )
     }
 
     @MainActor
